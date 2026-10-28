@@ -1,5 +1,6 @@
-import { z } from 'zod';
 import type { ApiRequest, TransportResult } from './api/transport';
+
+// Модуль без runtime-зависимостей: его импортирует preload, работающий в песочнице.
 
 /** Каналы IPC между renderer (через preload) и main-процессом. */
 export const IpcChannel = {
@@ -23,13 +24,11 @@ export interface SettingsView {
   mockApi: boolean;
 }
 
-export const settingsUpdateSchema = z.object({
-  apiUrl: z.string().max(500),
-  /** `undefined` — оставить сохранённый токен. */
-  token: z.string().max(1000).optional(),
-});
-
-export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
+export interface SettingsUpdate {
+  apiUrl: string;
+  /** `undefined` или пустая строка — оставить сохранённый токен. */
+  token?: string;
+}
 
 export type SettingsSaveResult = { ok: true; settings: SettingsView } | { ok: false; message: string };
 
