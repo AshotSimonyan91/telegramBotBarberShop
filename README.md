@@ -45,6 +45,9 @@ BOT_USERNAME=AshotSimonyanBot      # имя бота без @
 EXCEL_PATH=                        # путь к xlsx; пусто — файл на рабочем столе
 ADMIN_CHAT_ID=123456789            # ваш Telegram ID (узнать: @userinfobot)
 TIMEZONE=Asia/Yerevan
+API_ENABLED=                       # локальный REST API; пусто — включён, false — выключен
+API_PORT=                          # порт API; пусто — 8787
+API_TOKEN=                         # обязателен при включённом API: openssl rand -hex 32
 ```
 
 Переменные окружения имеют приоритет над `.env`. Файл `.env` не попадает в git — не публикуйте токен.
@@ -105,6 +108,35 @@ mvn -q compile exec:java -Dexec.args="--source=salon_1 --out=qr_salon_1.png"
 Получится PNG 1000×1000 с QR-кодом ссылки `https://t.me/<BOT_USERNAME>?start=<source>`
 и подписью «Отсканируйте, чтобы записаться». Для разных мест (стойка, зеркало, витрина)
 делайте разные `source`, чтобы видеть, откуда приходят клиенты.
+
+## Локальный REST API
+
+Бот в том же процессе поднимает HTTP API для настольного приложения: `http://127.0.0.1:8787/api/v1`
+(слушает **только** 127.0.0.1, порт — `API_PORT`). Выключается `API_ENABLED=false`.
+Если API включён, а `API_TOKEN` пуст, бот не стартует и пишет, что нужно задать токен.
+
+Все запросы, кроме `GET /api/v1/health`, требуют заголовок `Authorization: Bearer <API_TOKEN>`.
+JSON в UTF-8, даты `2026-10-30`, время `14:30`, дата создания `2026-10-28T15:04`.
+
+| Метод и путь | Что делает |
+|---|---|
+| `GET /health` | `{"status":"ok","timezone":..,"now":..}`, без токена |
+| `GET /status` | состояние бота и хранилища |
+| `GET /services`, `GET /masters` | услуги; активные мастера |
+| `GET /bookings?date=&from=&to=&status=&q=&masterName=` | записи по фильтру, по дате и времени |
+| `GET /bookings/{id}` | одна запись |
+| `POST /bookings` | новая запись администратора (`clientName`, `phone`, `serviceName`, `masterName` или null — любой свободный, `date`, `time`) → 201 |
+| `POST /bookings/{id}/cancel` | отмена; клиенту из Telegram уходит уведомление (заголовок `X-Client-Notified`) |
+| `GET /slots?serviceName=&date=&masterName=` | свободное время |
+| `GET /dates?serviceName=&masterName=&days=14` | рабочие даты (до 60 дней) |
+
+Ошибки: `{"error":"код","message":"текст","fields":{...}}` — `unauthorized` 401, `validation` 400,
+`not_found` 404, `slot_taken`/`already_cancelled` 409, `storage_busy` 503, `storage_error`/`internal` 500.
+CORS разрешён для `http://localhost:5173` (dev), `null`, `file://`, `app://` (`API_CORS_ORIGINS` — через запятую).
+
+```bash
+curl -H "Authorization: Bearer $API_TOKEN" http://127.0.0.1:8787/api/v1/bookings?date=2026-10-30
+```
 
 ## Тесты
 

@@ -1,0 +1,17 @@
+appId: com.salon.desktop
+productName: Салон
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asar: true
+electronDist: node_modules/electron/dist
+mac:
+  target: dir
+  category: public.app-category.business
+win:
+  target: dir
+linux:
+  target: dir
