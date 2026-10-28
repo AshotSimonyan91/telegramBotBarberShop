@@ -18,6 +18,7 @@ export function splitFieldErrors<F extends string>(
     }
   }
   const hasFieldErrors = Object.keys(fields).length > 0;
-  const message = unknown.length > 0 ? [error.message, ...unknown].join(' ') : hasFieldErrors ? null : error.message;
+  const message =
+    unknown.length > 0 ? [error.message, ...unknown].join(' ') : hasFieldErrors ? null : error.message;
   return { fields, message };
 }

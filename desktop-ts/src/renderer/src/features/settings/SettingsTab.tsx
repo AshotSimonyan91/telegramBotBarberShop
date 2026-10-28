@@ -97,7 +97,11 @@ function SettingsFormView({ settings }: { settings: SettingsView }) {
         <Field
           label="Адрес API"
           error={errors.apiUrl?.message}
-          hint={settings.apiUrlFromEnv ? 'Задан переменной окружения SALON_API_URL — здесь не меняется.' : undefined}
+          hint={
+            settings.apiUrlFromEnv
+              ? 'Задан переменной окружения SALON_API_URL — здесь не меняется.'
+              : undefined
+          }
         >
           {(control) => (
             <input

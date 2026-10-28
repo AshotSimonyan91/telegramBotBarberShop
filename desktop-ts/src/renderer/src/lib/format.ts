@@ -1,11 +1,11 @@
 import type { Booking, BookingStatus, Service } from '@shared/api/schemas';
 
-/** «5 000 ֏» — как в боте. */
+/** «5 000 ֏» (с неразрывными пробелами) — как в боте. */
 export function formatPrice(price: number): string {
   const grouped = Math.round(price)
     .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${grouped} ֏`;
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return `${grouped}\u00a0֏`;
 }
 
 /** «30 мин», «1 ч», «1 ч 30 мин» */
@@ -34,17 +34,23 @@ export function formatClient(booking: Pick<Booking, 'clientName' | 'username'>):
 }
 
 /**
- * Телефон для показа: убирает лишние пробелы; номер из одних цифр с «+» группирует для читаемости.
- * Введённое вручную форматирование («+374 77 55-44-33») оставляет как есть.
+ * Телефон для показа. Сервер хранит номер нормализованным (`+37491123456`), здесь он группируется:
+ * армянский — «+374 91 123 456», местный — «091 123 456». Остальные номера и старые записи
+ * с ручным форматированием («+374 77 55-44-33») показываются как есть, без лишних пробелов.
  */
 export function formatPhone(phone: string): string {
   const trimmed = phone.trim().replace(/\s+/g, ' ');
-  const compact = /^\+(\d{3})(\d{2})(\d{3})(\d{3})$/.exec(trimmed);
-  if (compact === null) {
-    return trimmed;
+  const armenian = /^\+374(\d{2})(\d{3})(\d{3})$/.exec(trimmed);
+  if (armenian !== null) {
+    const [, operator, a, b] = armenian;
+    return `+374 ${operator} ${a} ${b}`;
   }
-  const [, country, operator, a, b] = compact;
-  return `+${country} ${operator} ${a} ${b}`;
+  const local = /^0(\d{2})(\d{3})(\d{3})$/.exec(trimmed);
+  if (local !== null) {
+    const [, operator, a, b] = local;
+    return `0${operator} ${a} ${b}`;
+  }
+  return trimmed;
 }
 
 /** Склонение: plural(5, ['запись', 'записи', 'записей']). */

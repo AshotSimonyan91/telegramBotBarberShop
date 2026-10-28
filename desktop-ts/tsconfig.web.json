@@ -2,22 +2,9 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "lib": [
-      "ES2023",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": [
-      "vite/client",
-      "vitest/globals",
-      "@testing-library/jest-dom"
-    ]
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": [
-    "src/renderer/**/*",
-    "src/shared/**/*",
-    "src/mocks/**/*",
-    "src/preload/*.d.ts"
-  ]
+  "include": ["src/renderer/**/*", "src/shared/**/*", "src/mocks/**/*", "src/preload/*.d.ts"]
 }

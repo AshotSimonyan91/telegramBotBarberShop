@@ -1,11 +1,4 @@
-import {
-  keepPreviousData,
-  QueryClient,
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryKey,
-} from '@tanstack/react-query';
+import { keepPreviousData, QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '@shared/api/client';
 import type { BookingsQuery, CreateBookingRequest, LocalDate } from '@shared/api/schemas';
 import { currentDateTime, datePart, type ServerClock } from '@shared/datetime';
@@ -15,20 +8,22 @@ export const BOOKINGS_REFRESH_MS = 30_000;
 export const STATUS_REFRESH_MS = 15_000;
 export const DATES_AHEAD = 14;
 
+const API_KEY = ['api'] as const;
+
 export const queryKeys = {
-  all: ['api'] as const,
+  all: API_KEY,
   settings: ['settings'] as const,
-  health: () => [...queryKeys.all, 'health'] as const,
-  status: () => [...queryKeys.all, 'status'] as const,
-  services: () => [...queryKeys.all, 'services'] as const,
-  masters: () => [...queryKeys.all, 'masters'] as const,
-  bookings: () => [...queryKeys.all, 'bookings'] as const,
-  bookingList: (query: BookingsQuery) => [...queryKeys.bookings(), query] as const,
-  dates: (serviceName: string) => [...queryKeys.all, 'dates', serviceName] as const,
-  slotsAll: () => [...queryKeys.all, 'slots'] as const,
+  health: () => [...API_KEY, 'health'] as const,
+  status: () => [...API_KEY, 'status'] as const,
+  services: () => [...API_KEY, 'services'] as const,
+  masters: () => [...API_KEY, 'masters'] as const,
+  bookings: () => [...API_KEY, 'bookings'] as const,
+  bookingList: (query: BookingsQuery) => [...API_KEY, 'bookings', query] as const,
+  dates: (serviceName: string) => [...API_KEY, 'dates', serviceName] as const,
+  slotsAll: () => [...API_KEY, 'slots'] as const,
   slots: (serviceName: string, date: string, masterName: string) =>
-    [...queryKeys.slotsAll(), serviceName, date, masterName] as const,
-} satisfies Record<string, QueryKey | ((...args: never[]) => QueryKey)>;
+    [...API_KEY, 'slots', serviceName, date, masterName] as const,
+};
 
 /** Повторять только сетевые сбои и 5xx; ошибки 4xx повтором не исправить. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {

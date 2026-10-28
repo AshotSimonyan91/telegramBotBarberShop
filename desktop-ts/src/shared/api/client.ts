@@ -10,12 +10,13 @@ import {
   slotsSchema,
   statusSchema,
   type ApiErrorCode,
+  type Booking,
   type BookingsQuery,
   type CreateBookingRequest,
   type DatesQuery,
   type SlotsQuery,
 } from './schemas';
-import type { ApiRequest, Transport } from './transport';
+import type { ApiRequest, ResponseHeaders, Transport } from './transport';
 
 export type ApiErrorKind = 'http' | 'network' | 'invalid-response' | 'not-configured';
 
@@ -50,18 +51,60 @@ const STATUS_MESSAGES: Readonly<Record<number, string>> = {
   503: 'Хранилище занято. Повторите через несколько секунд.',
 };
 
+/**
+ * Общее сообщение, когда сервер не знает запрошенный путь или метод (404 на неизвестный путь, 405):
+ * обычно это значит, что версия бота не совпадает с версией приложения.
+ */
+export const UNSUPPORTED_REQUEST_MESSAGE =
+  'Сервер не поддерживает этот запрос. Возможно, версия бота устарела — обновите бота и приложение.';
+
+/** Пути, где 404 означает «записи нет», а не «неизвестный адрес». */
+const BOOKING_PATH = /^\/bookings\/\d+(\/cancel)?$/;
+
 function fallbackMessage(status: number): string {
-  return STATUS_MESSAGES[status] ?? (status >= 500 ? 'Ошибка на сервере. Повторите позже.' : `Ошибка запроса (${status}).`);
+  return (
+    STATUS_MESSAGES[status] ??
+    (status >= 500 ? 'Ошибка на сервере. Повторите позже.' : `Ошибка запроса (${status}).`)
+  );
 }
 
-function toHttpError(status: number, body: unknown): ApiError {
+function isUnsupportedRequest(request: ApiRequest, status: number, code: ApiErrorCode | null): boolean {
+  if (status === 405 || code === 'method_not_allowed') {
+    return true;
+  }
+  return status === 404 && !BOOKING_PATH.test(request.path);
+}
+
+function toHttpError(request: ApiRequest, status: number, body: unknown): ApiError {
   const parsed = apiErrorBodySchema.safeParse(body);
+  const codeResult = parsed.success ? apiErrorCodeSchema.safeParse(parsed.data.error) : null;
+  const code = codeResult?.success === true ? codeResult.data : null;
+  if (isUnsupportedRequest(request, status, code)) {
+    return new ApiError('http', UNSUPPORTED_REQUEST_MESSAGE, status, code);
+  }
   if (!parsed.success) {
     return new ApiError('http', fallbackMessage(status), status);
   }
-  const code = apiErrorCodeSchema.safeParse(parsed.data.error);
   const message = parsed.data.message.trim() === '' ? fallbackMessage(status) : parsed.data.message;
-  return new ApiError('http', message, status, code.success ? code.data : null, parsed.data.fields ?? {});
+  return new ApiError('http', message, status, code, parsed.data.fields ?? {});
+}
+
+/** Результат отмены. `clientNotified: null` — клиент не из Telegram, уведомлять было некого. */
+export interface CancelBookingResult {
+  booking: Booking;
+  clientNotified: boolean | null;
+}
+
+/** Заголовок `X-Client-Notified: true|false`; без заголовка или с другим значением — `null`. */
+export function parseClientNotified(headers: ResponseHeaders): boolean | null {
+  const value = headers['x-client-notified']?.trim().toLowerCase();
+  if (value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  return null;
 }
 
 function compactQuery(query: Record<string, string | number | null | undefined>): Record<string, string> {
@@ -75,7 +118,10 @@ function compactQuery(query: Record<string, string | number | null | undefined>)
 }
 
 export function createApiClient(transport: Transport) {
-  async function call<S extends z.ZodType>(request: ApiRequest, schema: S): Promise<z.infer<S>> {
+  async function callWithHeaders<S extends z.ZodType>(
+    request: ApiRequest,
+    schema: S,
+  ): Promise<{ data: z.output<S>; headers: ResponseHeaders }> {
     const result = await transport(request);
     if (result.kind === 'not-configured') {
       throw new ApiError('not-configured', 'Не заданы адрес и токен API. Откройте настройки.');
@@ -84,13 +130,17 @@ export function createApiClient(transport: Transport) {
       throw new ApiError('network', `${result.message} Проверьте, что бот запущен и адрес API указан верно.`);
     }
     if (result.status < 200 || result.status >= 300) {
-      throw toHttpError(result.status, result.body);
+      throw toHttpError(request, result.status, result.body);
     }
     const parsed = schema.safeParse(result.body);
     if (!parsed.success) {
       throw new ApiError('invalid-response', 'Сервер вернул данные в неожиданном формате.', result.status);
     }
-    return parsed.data;
+    return { data: parsed.data, headers: result.headers };
+  }
+
+  async function call<S extends z.ZodType>(request: ApiRequest, schema: S): Promise<z.output<S>> {
+    return (await callWithHeaders(request, schema)).data;
   }
 
   return {
@@ -103,9 +153,17 @@ export function createApiClient(transport: Transport) {
     booking: (id: number) => call({ method: 'GET', path: `/bookings/${id}` }, bookingSchema),
     createBooking: (body: CreateBookingRequest) =>
       call({ method: 'POST', path: '/bookings', body }, bookingSchema),
-    cancelBooking: (id: number) => call({ method: 'POST', path: `/bookings/${id}/cancel` }, bookingSchema),
-    slots: (query: SlotsQuery) => call({ method: 'GET', path: '/slots', query: compactQuery({ ...query }) }, slotsSchema),
-    dates: (query: DatesQuery) => call({ method: 'GET', path: '/dates', query: compactQuery({ ...query }) }, datesSchema),
+    cancelBooking: async (id: number): Promise<CancelBookingResult> => {
+      const { data, headers } = await callWithHeaders(
+        { method: 'POST', path: `/bookings/${id}/cancel` },
+        bookingSchema,
+      );
+      return { booking: data, clientNotified: parseClientNotified(headers) };
+    },
+    slots: (query: SlotsQuery) =>
+      call({ method: 'GET', path: '/slots', query: compactQuery({ ...query }) }, slotsSchema),
+    dates: (query: DatesQuery) =>
+      call({ method: 'GET', path: '/dates', query: compactQuery({ ...query }) }, datesSchema),
   };
 }
 

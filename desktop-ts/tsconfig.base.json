@@ -17,15 +17,9 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@renderer/*": [
-        "src/renderer/src/*"
-      ],
-      "@mocks/*": [
-        "src/mocks/*"
-      ]
+      "@shared/*": ["src/shared/*"],
+      "@renderer/*": ["src/renderer/src/*"],
+      "@mocks/*": ["src/mocks/*"]
     }
   }
 }

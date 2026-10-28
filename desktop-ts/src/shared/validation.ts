@@ -3,14 +3,23 @@ import { localDateSchema, localTimeSchema, type LocalDate } from './api/schemas'
 
 /**
  * Правила проверки новой записи — те же, что на сервере:
- * имя 2..100 символов, телефон 5..20 символов (цифры, +, пробелы, -, скобки), дата не в прошлом.
+ * имя 2..100 символов, телефон 5..20 символов (цифры, пробелы, дефисы, скобки; «+» только первым
+ * символом) и не меньше 5 цифр, дата существует и не в прошлом, время 00:00..23:59. Сервер сам приводит телефон к виду `+37491123456`.
  */
 
 export const CLIENT_NAME_MIN = 2;
 export const CLIENT_NAME_MAX = 100;
 export const PHONE_MIN = 5;
 export const PHONE_MAX = 20;
-export const PHONE_PATTERN = /^[0-9+\s\-()]+$/;
+export const PHONE_MIN_DIGITS = 5;
+/** Как на сервере (`\+?[0-9\s()\-]+`): «+» допускается только первым символом. */
+export const PHONE_PATTERN = /^\+?[0-9\s()-]+$/;
+export const PHONE_FORMAT_MESSAGE =
+  'Телефон: от 5 до 20 символов — цифры, пробелы, дефисы и скобки, «+» только в начале.';
+
+export function countDigits(value: string): number {
+  return value.replace(/\D/g, '').length;
+}
 
 /** Убирает пробелы по краям и схлопывает повторяющиеся пробелы. */
 export function normalizeSpaces(value: string): string {
@@ -35,9 +44,13 @@ export const phoneSchema = z
     z
       .string()
       .min(1, 'Введите телефон.')
-      .regex(PHONE_PATTERN, 'Телефон может содержать только цифры, «+», пробелы, «-» и скобки.')
+      .regex(PHONE_PATTERN, PHONE_FORMAT_MESSAGE)
       .min(PHONE_MIN, `Телефон — не короче ${PHONE_MIN} символов.`)
-      .max(PHONE_MAX, `Телефон — не длиннее ${PHONE_MAX} символов.`),
+      .max(PHONE_MAX, `Телефон — не длиннее ${PHONE_MAX} символов.`)
+      .refine(
+        (value) => countDigits(value) >= PHONE_MIN_DIGITS,
+        `В телефоне должно быть не меньше ${PHONE_MIN_DIGITS} цифр.`,
+      ),
   );
 
 /** Значение поля «Мастер» в форме: пустая строка — «Любой мастер». */

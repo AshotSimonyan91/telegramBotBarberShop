@@ -90,21 +90,52 @@ public class BookingService {
     public Booking book(Booking draft, Master master) {
         bookingLock.lock();
         try {
-            List<Booking> existing = repository.getBookings(master.getName(), draft.getDate());
-            if (!slotCalculator.isFree(master, draft.getDate(), draft.getTime(), draft.getDurationMinutes(), existing)) {
+            if (!isFreeNow(master, draft)) {
                 throw new SlotTakenException();
             }
-            Booking booking = draft.toBuilder()
-                    .masterName(master.getName())
-                    .createdAt(LocalDateTime.now(clock).withSecond(0).withNano(0))
-                    .status(BookingStatus.CONFIRMED)
-                    .reminderSent(false)
-                    .build();
-            long id = repository.addBooking(booking);
-            return booking.withId(id);
+            return save(draft, master);
         } finally {
             bookingLock.unlock();
         }
+    }
+
+    /**
+     * Запись к первому из {@code masters}, свободному в указанное время («любой мастер»).
+     * Выбор мастера, проверка слота и сохранение выполняются атомарно под той же блокировкой, что и
+     * {@link #book(Booking, Master)}, поэтому параллельные запросы на один слот распределяются по свободным
+     * мастерам, а не получают ложный отказ.
+     *
+     * @throws SlotTakenException если в это время свободных мастеров нет
+     */
+    public Booking bookWithAnyMaster(Booking draft, List<Master> masters) {
+        bookingLock.lock();
+        try {
+            Master master = masters.stream()
+                    .filter(m -> isFreeNow(m, draft))
+                    .findFirst()
+                    .orElseThrow(SlotTakenException::new);
+            return save(draft, master);
+        } finally {
+            bookingLock.unlock();
+        }
+    }
+
+    /** Вызывается под {@link #bookingLock}. */
+    private boolean isFreeNow(Master master, Booking draft) {
+        List<Booking> existing = repository.getBookings(master.getName(), draft.getDate());
+        return slotCalculator.isFree(master, draft.getDate(), draft.getTime(), draft.getDurationMinutes(), existing);
+    }
+
+    /** Вызывается под {@link #bookingLock}. */
+    private Booking save(Booking draft, Master master) {
+        Booking booking = draft.toBuilder()
+                .masterName(master.getName())
+                .createdAt(LocalDateTime.now(clock).withSecond(0).withNano(0))
+                .status(BookingStatus.CONFIRMED)
+                .reminderSent(false)
+                .build();
+        long id = repository.addBooking(booking);
+        return booking.withId(id);
     }
 
     /** Будущие активные записи клиента. */

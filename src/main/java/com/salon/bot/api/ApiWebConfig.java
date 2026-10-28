@@ -30,7 +30,7 @@ public class ApiWebConfig {
         cors.setAllowedOriginPatterns(properties.corsOrigins());
         cors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
         cors.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.ACCEPT));
-        cors.setExposedHeaders(List.of(HttpHeaders.LOCATION));
+        cors.setExposedHeaders(List.of(HttpHeaders.LOCATION, BookingsController.CLIENT_NOTIFIED_HEADER));
         cors.setAllowCredentials(false);
         cors.setMaxAge(Duration.ofHours(1));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

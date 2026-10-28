@@ -38,7 +38,7 @@ public class BookingApiService {
 
     static final int MAX_DAYS = 60;
     static final int DEFAULT_DAYS = 14;
-    private static final Pattern PHONE_CHARS = Pattern.compile("[0-9+\\s()\\-]+");
+    private static final Pattern PHONE_CHARS = Pattern.compile("\\+?[0-9\\s()\\-]+");
     private static final Pattern PHONE_SEPARATORS = Pattern.compile("[\\s()\\-]");
 
     private final BookingService bookingService;
@@ -102,7 +102,7 @@ public class BookingApiService {
         String phone = PHONE_SEPARATORS.matcher(phoneRaw).replaceAll("");
         if (phoneRaw.length() < 5 || phoneRaw.length() > 20 || !PHONE_CHARS.matcher(phoneRaw).matches()
                 || phone.chars().filter(Character::isDigit).count() < 5) {
-            errors.put("phone", "Телефон: от 5 до 20 символов — цифры, «+», пробелы, дефисы и скобки");
+            errors.put("phone", "Телефон: от 5 до 20 символов — цифры, пробелы, дефисы и скобки, «+» только в начале");
         }
 
         Service service = null;
@@ -149,11 +149,10 @@ public class BookingApiService {
                 .durationMinutes(service.getDurationMinutes())
                 .build();
 
-        Master chosen = master != null
-                ? master
-                : bookingService.firstFreeMaster(bookingService.activeMasters(), date, time,
-                        service.getDurationMinutes()).orElseThrow(ApiException::slotTaken);
-        Booking booking = bookingService.book(draft, chosen);
+        // «Любой мастер»: выбор свободного мастера и запись — атомарно, под одной блокировкой.
+        Booking booking = master != null
+                ? bookingService.book(draft, master)
+                : bookingService.bookWithAnyMaster(draft, bookingService.activeMasters());
         log.info("API: создана запись №{} ({} {} {}, мастер {})", booking.getId(), booking.getServiceName(),
                 booking.getDate(), booking.getTime(), booking.getMasterName());
         return booking;

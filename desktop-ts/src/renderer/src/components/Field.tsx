@@ -32,7 +32,11 @@ export function Field({
       <label htmlFor={id} className="text-sm font-medium text-slate-700 dark:text-slate-200">
         {label}
       </label>
-      {children({ id, 'aria-describedby': describedBy === '' ? undefined : describedBy, 'aria-invalid': error !== undefined })}
+      {children({
+        id,
+        'aria-describedby': describedBy === '' ? undefined : describedBy,
+        'aria-invalid': error !== undefined,
+      })}
       {hint !== undefined && (
         <p id={hintId} className="text-xs text-slate-600 dark:text-slate-400">
           {hint}

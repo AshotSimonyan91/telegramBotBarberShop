@@ -4,6 +4,8 @@ import { addDays, combine, datePart, fromMinutes, toMinutes, weekdayOf } from '@
 /**
  * Данные мок-API в памяти: используются в тестах и в режиме `npm run dev:mock`.
  * Свободное время считается упрощённо (шаг 30 минут, без перерывов) — только для разработки UI.
+ * Поведение повторяет сервер: /dates отдаёт рабочие дни мастеров (свободного времени в такой день
+ * может не быть), телефон хранится нормализованным (`+37491123456`), у старых строк нет `createdAt`.
  */
 
 export const SLOT_STEP_MINUTES = 30;
@@ -17,6 +19,8 @@ export interface MockDb {
   nextId: number;
   bot: { running: boolean; username: string };
   storage: { ok: boolean; file: string };
+  /** Удаётся ли боту уведомить клиента в Telegram об отмене (заголовок `X-Client-Notified`). */
+  telegram: { notifyOk: boolean };
 }
 
 export function createMockDb(now: () => LocalDateTime): MockDb {
@@ -75,7 +79,7 @@ export function createMockDb(now: () => LocalDateTime): MockDb {
         ...base,
         id: 2,
         clientName: 'Лилит Саргсян',
-        phone: '+374 77 55-44-33',
+        phone: '+37477554433',
         serviceName: 'Окрашивание',
         masterName: 'Карен',
         date: addDays(today, 1),
@@ -94,12 +98,26 @@ export function createMockDb(now: () => LocalDateTime): MockDb {
         time: '10:30',
         durationMinutes: 60,
         status: 'CANCELLED',
+        // старая строка Excel без времени создания
+        createdAt: null,
       },
     ],
     nextId: 4,
     bot: { running: true, username: 'AshotSimonyanBot' },
     storage: { ok: true, file: 'salon_bookings.xlsx' },
+    telegram: { notifyOk: true },
   };
+}
+
+/** Телефон так, как его хранит сервер: «+» (если был) и только цифры. */
+export function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return phone.trim().startsWith('+') ? `+${digits}` : digits;
+}
+
+/** Работает ли мастер в этот день недели. */
+export function worksOn(master: Master, date: LocalDate): boolean {
+  return master.workDays.includes(weekdayOf(date));
 }
 
 export function activeMasters(db: MockDb, masterName?: string | null): Master[] {
@@ -112,7 +130,7 @@ function overlaps(startA: number, durationA: number, startB: number, durationB: 
 
 /** Свободное время мастера на дату. */
 export function masterSlots(db: MockDb, master: Master, date: LocalDate, duration: number): LocalTime[] {
-  if (!master.workDays.includes(weekdayOf(date))) {
+  if (!worksOn(master, date)) {
     return [];
   }
   const now = db.now();
@@ -120,7 +138,11 @@ export function masterSlots(db: MockDb, master: Master, date: LocalDate, duratio
     (b) => b.status === 'CONFIRMED' && b.masterName === master.name && b.date === date,
   );
   const slots: LocalTime[] = [];
-  for (let start = toMinutes(master.workStart); start + duration <= toMinutes(master.workEnd); start += SLOT_STEP_MINUTES) {
+  for (
+    let start = toMinutes(master.workStart);
+    start + duration <= toMinutes(master.workEnd);
+    start += SLOT_STEP_MINUTES
+  ) {
     const time = fromMinutes(start);
     if (combine(date, time) <= now) {
       continue;
@@ -134,7 +156,12 @@ export function masterSlots(db: MockDb, master: Master, date: LocalDate, duratio
 }
 
 /** Свободное время на дату: у конкретного мастера или у любого активного. */
-export function freeSlots(db: MockDb, date: LocalDate, duration: number, masterName?: string | null): LocalTime[] {
+export function freeSlots(
+  db: MockDb,
+  date: LocalDate,
+  duration: number,
+  masterName?: string | null,
+): LocalTime[] {
   const all = new Set<LocalTime>();
   for (const master of activeMasters(db, masterName)) {
     masterSlots(db, master, date, duration).forEach((slot) => all.add(slot));
@@ -153,16 +180,25 @@ export function pickMaster(
   return activeMasters(db, masterName).find((m) => masterSlots(db, m, date, duration).includes(time)) ?? null;
 }
 
-export function availableDates(db: MockDb, serviceName: string, masterName: string | null, days: number): LocalDate[] {
-  const service = db.services.find((s) => s.name === serviceName);
-  if (service === undefined) {
+/**
+ * Даты для записи, как на сервере: рабочие дни активных мастеров (или выбранного мастера)
+ * начиная с сегодняшнего. Есть ли в этот день свободное время, здесь не проверяется.
+ */
+export function availableDates(
+  db: MockDb,
+  serviceName: string,
+  masterName: string | null,
+  days: number,
+): LocalDate[] {
+  if (!db.services.some((s) => s.name === serviceName)) {
     return [];
   }
+  const masters = activeMasters(db, masterName);
   const today = datePart(db.now());
   const result: LocalDate[] = [];
   for (let i = 0; i < days; i++) {
     const date = addDays(today, i);
-    if (freeSlots(db, date, service.durationMinutes, masterName).length > 0) {
+    if (masters.some((m) => worksOn(m, date))) {
       result.push(date);
     }
   }

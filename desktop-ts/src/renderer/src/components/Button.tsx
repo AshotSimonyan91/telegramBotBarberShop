@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'ghostDanger';
 
 const VARIANTS: Readonly<Record<Variant, string>> = {
   primary:
@@ -9,6 +9,7 @@ const VARIANTS: Readonly<Record<Variant, string>> = {
     'border border-slate-300 bg-white text-slate-800 hover:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:text-slate-500',
   danger:
     'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-600/50 dark:bg-red-500 dark:hover:bg-red-400 dark:text-slate-950',
+  ghostDanger: 'text-red-700 hover:bg-red-50 disabled:text-slate-400 dark:text-red-400 dark:hover:bg-red-950',
   ghost:
     'text-slate-700 hover:bg-slate-200/70 disabled:text-slate-400 dark:text-slate-200 dark:hover:bg-slate-800',
 };
@@ -18,7 +19,13 @@ export interface ButtonProps extends ComponentProps<'button'> {
   size?: 'sm' | 'md';
 }
 
-export function Button({ variant = 'secondary', size = 'md', className = '', type = 'button', ...props }: ButtonProps) {
+export function Button({
+  variant = 'secondary',
+  size = 'md',
+  className = '',
+  type = 'button',
+  ...props
+}: ButtonProps) {
   const sizing = size === 'sm' ? 'px-2.5 py-1 text-sm' : 'px-3.5 py-2 text-sm';
   return (
     <button

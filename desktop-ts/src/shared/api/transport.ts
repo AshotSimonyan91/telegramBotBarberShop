@@ -17,8 +17,16 @@ export const apiRequestSchema = z.object({
 
 export type ApiRequest = z.infer<typeof apiRequestSchema>;
 
+/**
+ * Заголовки ответа, которые main-процесс передаёт в renderer (имена в нижнем регистре).
+ * Остальные заголовки через IPC не пересылаются.
+ */
+export const EXPOSED_HEADERS = ['x-client-notified'] as const;
+export type ExposedHeader = (typeof EXPOSED_HEADERS)[number];
+export type ResponseHeaders = Partial<Record<ExposedHeader, string>>;
+
 export type TransportResult =
-  | { kind: 'response'; status: number; body: unknown }
+  | { kind: 'response'; status: number; body: unknown; headers: ResponseHeaders }
   | { kind: 'network-error'; message: string }
   | { kind: 'not-configured' };
 
@@ -75,6 +83,17 @@ export function buildUrl(baseUrl: string, request: ApiRequest): string {
   return url.toString();
 }
 
+function pickHeaders(headers: Headers): ResponseHeaders {
+  const result: ResponseHeaders = {};
+  for (const name of EXPOSED_HEADERS) {
+    const value = headers.get(name);
+    if (value !== null) {
+      result[name] = value;
+    }
+  }
+  return result;
+}
+
 async function readBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (text.trim() === '') {
@@ -125,7 +144,12 @@ export function createFetchTransport(options: FetchTransportOptions): Transport 
         redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
-      return { kind: 'response', status: response.status, body: await readBody(response) };
+      return {
+        kind: 'response',
+        status: response.status,
+        body: await readBody(response),
+        headers: pickHeaders(response.headers),
+      };
     } catch (error) {
       return { kind: 'network-error', message: describeNetworkError(error) };
     }

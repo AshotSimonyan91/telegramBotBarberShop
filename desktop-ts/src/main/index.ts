@@ -1,7 +1,12 @@
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, ipcMain, session, shell, type IpcMainInvokeEvent } from 'electron';
-import { apiRequestSchema, createFetchTransport, isAllowedRequest, type TransportResult } from '@shared/api/transport';
+import {
+  apiRequestSchema,
+  createFetchTransport,
+  isAllowedRequest,
+  type TransportResult,
+} from '@shared/api/transport';
 import { IpcChannel, type SettingsSaveResult } from '@shared/ipc';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 
@@ -66,6 +71,15 @@ function createWindow(): BrowserWindow {
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.webContents.on('will-attach-webview', (event) => event.preventDefault());
 
+  if (!app.isPackaged) {
+    // В разработке предупреждения и ошибки страницы дублируются в терминал.
+    window.webContents.on('console-message', (details) => {
+      if (details.level === 'warning' || details.level === 'error') {
+        console.log(`[renderer:${details.level}] ${details.message}`);
+      }
+    });
+  }
+
   if (devServerUrl !== undefined && !app.isPackaged) {
     void window.loadURL(devServerUrl);
   } else {
@@ -94,7 +108,12 @@ async function main(): Promise<void> {
     }
     const request = apiRequestSchema.safeParse(raw);
     if (!request.success || !isAllowedRequest(request.data)) {
-      return { kind: 'response', status: 400, body: { error: 'validation', message: 'Недопустимый запрос.' } };
+      return {
+        kind: 'response',
+        status: 400,
+        body: { error: 'validation', message: 'Недопустимый запрос.' },
+        headers: {},
+      };
     }
     return transport(request.data);
   });

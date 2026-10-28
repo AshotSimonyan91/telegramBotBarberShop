@@ -23,4 +23,4 @@ bot:
 api:
   enabled: ${API_ENABLED:true}
   token: ${API_TOKEN:}
-  cors-origins: ${API_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,null,file://*,app://*}
+  cors-origins: ${API_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,null,file://,file://*,app://,app://*}

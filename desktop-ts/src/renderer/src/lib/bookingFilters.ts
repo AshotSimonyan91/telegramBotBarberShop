@@ -1,4 +1,11 @@
-import type { Booking, BookingStatus, BookingsQuery, LocalDate, LocalDateTime, Master } from '@shared/api/schemas';
+import type {
+  Booking,
+  BookingStatus,
+  BookingsQuery,
+  LocalDate,
+  LocalDateTime,
+  Master,
+} from '@shared/api/schemas';
 import { addDays, combine, weekdayOf } from '@shared/datetime';
 
 /**
@@ -37,8 +44,9 @@ const STATUS_PARAM: Readonly<Record<StatusFilter, BookingStatus | undefined>> = 
 /** Пустая строка в `masterName` — все мастера. */
 export interface BookingFilters {
   period: Period;
-  from: LocalDate | '';
-  to: LocalDate | '';
+  /** Пустая строка — без ограничения. */
+  from: LocalDate;
+  to: LocalDate;
   status: StatusFilter;
   masterName: string;
   q: string;
@@ -171,7 +179,8 @@ function sortValue(booking: Booking, key: SortKey): string | number {
     case 'start':
       return bookingStart(booking);
     case 'createdAt':
-      return booking.createdAt;
+      // записи без времени создания (старые строки) — в начале при сортировке по возрастанию
+      return booking.createdAt ?? '';
     default:
       return booking[key];
   }

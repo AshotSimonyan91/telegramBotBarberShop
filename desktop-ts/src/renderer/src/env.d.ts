@@ -1,2 +1,2 @@
 /// <reference types="vite/client" />
-/// <reference path="../../preload/index.d.ts" />
+// Тип window.salon объявлен в src/preload/index.d.ts (подключён через tsconfig.web.json).

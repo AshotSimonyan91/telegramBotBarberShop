@@ -317,7 +317,9 @@ public class ExcelBookingRepository implements BookingRepository {
                 .id((long) number(row, COL_ID))
                 .createdAt(dateTime(row, COL_CREATED))
                 .clientName(text(row, COL_CLIENT))
-                .telegramId((long) number(row, COL_TELEGRAM_ID))
+                // Пустой Telegram ID (ручная правка Excel) — запись без Telegram, как у администратора:
+                // строка должна быть видна и занимать слот, иначе возможна двойная запись.
+                .telegramId(isBlank(row, COL_TELEGRAM_ID) ? 0 : (long) number(row, COL_TELEGRAM_ID))
                 .username(text(row, COL_USERNAME))
                 .phone(text(row, COL_PHONE))
                 .serviceName(serviceName)
@@ -668,6 +670,10 @@ public class ExcelBookingRepository implements BookingRepository {
     private String text(Row row, int col) {
         Cell cell = row.getCell(col);
         return cell == null ? "" : formatter.formatCellValue(cell).trim();
+    }
+
+    private boolean isBlank(Row row, int col) {
+        return text(row, col).isEmpty();
     }
 
     private double number(Row row, int col) {

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
-import { defineConfig, type Plugin } from 'electron-vite';
+import { defineConfig } from 'electron-vite';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -54,5 +55,6 @@ export default defineConfig({
   renderer: {
     resolve: { alias },
     plugins: [contentSecurityPolicy(), react(), tailwindcss()],
+    build: { minify: true },
   },
 });

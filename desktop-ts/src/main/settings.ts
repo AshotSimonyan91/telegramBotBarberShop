@@ -3,7 +3,12 @@ import { join } from 'node:path';
 import { app, safeStorage } from 'electron';
 import { z } from 'zod';
 import { normalizeBaseUrl, type ApiConnection } from '@shared/api/transport';
-import { DEFAULT_API_URL, type SettingsSaveResult, type SettingsUpdate, type SettingsView } from '@shared/ipc';
+import {
+  DEFAULT_API_URL,
+  type SettingsSaveResult,
+  type SettingsUpdate,
+  type SettingsView,
+} from '@shared/ipc';
 
 /**
  * Настройки подключения к API. Источники по приоритету: переменные окружения
@@ -36,6 +41,8 @@ function envValue(name: string): string | null {
 
 export class SettingsStore {
   private stored: Stored = {};
+  /** Расшифрованный сохранённый токен (расшифровывается один раз при загрузке). */
+  private savedToken: string | null = null;
   private readonly file = join(app.getPath('userData'), 'settings.json');
 
   constructor(private readonly overrides: Overrides) {}
@@ -53,20 +60,22 @@ export class SettingsStore {
       }
       this.stored = {};
     }
+    this.savedToken = await this.decryptStoredToken();
   }
 
-  private storedToken(): string | null {
+  private async decryptStoredToken(): Promise<string | null> {
     const { token, tokenEncrypted } = this.stored;
     if (token === undefined || token === '') {
       return null;
     }
-    if (!tokenEncrypted) {
+    if (tokenEncrypted !== true) {
       return token;
     }
     try {
-      return safeStorage.decryptString(Buffer.from(token, 'base64'));
+      const { result } = await safeStorage.decryptStringAsync(Buffer.from(token, 'base64'));
+      return result;
     } catch {
-      console.warn('Не удалось расшифровать сохранённый токен');
+      console.warn('Не удалось расшифровать сохранённый токен — введите его заново в настройках');
       return null;
     }
   }
@@ -78,7 +87,7 @@ export class SettingsStore {
   }
 
   private token(): string | null {
-    return envValue('SALON_API_TOKEN') ?? this.storedToken() ?? this.overrides.mockToken;
+    return envValue('SALON_API_TOKEN') ?? this.savedToken ?? this.overrides.mockToken;
   }
 
   /** Подключение для запросов; `null`, если токен не задан. */
@@ -106,8 +115,8 @@ export class SettingsStore {
     const next: Stored = { ...this.stored, apiUrl };
     const token = update.token?.trim();
     if (token !== undefined && token !== '') {
-      if (safeStorage.isEncryptionAvailable()) {
-        next.token = safeStorage.encryptString(token).toString('base64');
+      if (await safeStorage.isAsyncEncryptionAvailable()) {
+        next.token = (await safeStorage.encryptStringAsync(token)).toString('base64');
         next.tokenEncrypted = true;
       } else {
         next.token = token;
@@ -123,6 +132,9 @@ export class SettingsStore {
       return { ok: false, message: 'Не удалось сохранить настройки на диск.' };
     }
     this.stored = next;
+    if (token !== undefined && token !== '') {
+      this.savedToken = token;
+    }
     return { ok: true, settings: this.view() };
   }
 }

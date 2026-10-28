@@ -42,7 +42,10 @@ export function StatusIndicator() {
   }
   const { bot, storage } = status.data;
   return (
-    <ul aria-label="Состояние системы" className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
+    <ul
+      aria-label="Состояние системы"
+      className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300"
+    >
       <Indicator
         tone={bot.running ? 'ok' : 'warn'}
         label="Бот"
