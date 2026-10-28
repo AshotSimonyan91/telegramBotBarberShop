@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: salon-bot
+  main:
+    banner-mode: off
+
+# Локальный REST API: слушает только 127.0.0.1. Если API_ENABLED=false — веб-сервер не поднимается
+# (тип приложения выбирает BotApplication.main).
+server:
+  address: 127.0.0.1
+  port: ${API_PORT:8787}
+  error:
+    whitelabel:
+      enabled: false
+
+bot:
+  token: ${BOT_TOKEN:}
+  username: ${BOT_USERNAME:AshotSimonyanBot}
+  excel-path: ${EXCEL_PATH:salon_bookings.xlsx}
+  admin-chat-id: ${ADMIN_CHAT_ID:}
+  timezone: ${TIMEZONE:Asia/Yerevan}
+
+api:
+  enabled: ${API_ENABLED:true}
+  token: ${API_TOKEN:}
+  cors-origins: ${API_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,null,file://*,app://*}

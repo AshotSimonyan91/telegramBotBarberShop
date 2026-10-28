@@ -1,0 +1,16 @@
+.env
+target/
+*.xlsx
+.idea/
+*.iml
+.DS_Store
+logs/
+backups/
+node_modules/
+desktop-ts/node_modules/
+desktop-ts/dist/
+desktop-ts/out/
+desktop-ts/release/
+.salon_bookings.xlsx.lock
+*.log
+.claude/settings.local.json
